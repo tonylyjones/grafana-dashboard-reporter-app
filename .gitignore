@@ -68,3 +68,5 @@ plugin-validator
 
 # Ignore legacy golanglint ci config file
 .golangci.bck.yml
+
+.claude
