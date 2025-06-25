@@ -107,5 +107,39 @@ func TestReportResource(t *testing.T) {
 
 			So(repDashName, ShouldEqual, "testDash")
 		})
+
+		Convey("It should forward organization ID header when orgId parameter is provided", func() {
+			var receivedOrgId string
+
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasPrefix(r.URL.Path, "/api/dashboards/") {
+					receivedOrgId = r.Header.Get("X-Grafana-Org-Id")
+				}
+
+				if _, err := w.Write([]byte(`{"dashboard": {"title": "foo","panels":[{"type":"singlestat", "id":0}]}}`)); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+
+					return
+				}
+			}))
+			defer ts.Close()
+
+			ctx := backend.WithGrafanaConfig(t.Context(), backend.NewGrafanaCfg(map[string]string{
+				backend.AppURL: ts.URL,
+			}))
+
+			var r mockCallResourceResponseSender
+			err = app.CallResource(ctx, &backend.CallResourceRequest{
+				PluginContext: backend.PluginContext{
+					OrgID:    3,
+					PluginID: "my-plugin",
+					User:     &backend.User{Name: "foobar", Email: "foo@bar.com", Login: "foo@bar.com"},
+				},
+				Method: http.MethodGet,
+				Path:   "report?dashUid=testDash&orgId=5",
+			}, &r)
+
+			So(receivedOrgId, ShouldEqual, "5")
+		})
 	})
 }

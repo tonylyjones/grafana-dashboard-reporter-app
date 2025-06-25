@@ -142,7 +142,7 @@ func (app *App) grafanaAppURL(grafanaConfig *backend.GrafanaCfg) (string, error)
 }
 
 // dashboardModel fetches dashboard JSON model from Grafana API.
-func (app *App) dashboardModel(ctx context.Context, appURL, dashUID string, authHeader http.Header, values url.Values) (*dashboard.Model, error) {
+func (app *App) dashboardModel(ctx context.Context, appURL, dashUID string, header http.Header, values url.Values) (*dashboard.Model, error) {
 	dashURL := fmt.Sprintf("%s/api/dashboards/uid/%s", appURL, dashUID)
 
 	// Create a new GET request
@@ -151,8 +151,8 @@ func (app *App) dashboardModel(ctx context.Context, appURL, dashUID string, auth
 		return nil, fmt.Errorf("error creating request for %s: %w", dashURL, err)
 	}
 
-	// Forward auth headers
-	for name, values := range authHeader {
+	// Forward headers
+	for name, values := range header {
 		for _, value := range values {
 			req.Header.Add(name, value)
 		}
@@ -223,6 +223,9 @@ func (app *App) handleReport(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
+	// Get Organization ID
+	orgID := req.URL.Query().Get("orgId")
+
 	// Add dash uid and user to logger
 	ctxLogger = ctxLogger.With("user", currentUser, "dash_uid", dashboardUID)
 
@@ -286,6 +289,11 @@ func (app *App) handleReport(w http.ResponseWriter, req *http.Request) {
 		}
 
 		authHeader.Add(backend.OAuthIdentityTokenHeaderName, "Bearer "+saToken)
+	}
+
+	// Add organization ID header if provided
+	if orgID != "" {
+		authHeader.Add("X-Grafana-Org-Id", orgID)
 	}
 
 	// Get dashboard JSON model from API
